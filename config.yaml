@@ -1,0 +1,52 @@
+seed: 42
+
+model: "gpt2-large"
+base_model: "gpt2-large"
+
+data:
+  nightmares: "data/nightmares_train.txt"
+  pairs_train: "data/final_train.jsonl"
+  pairs_val: "data/final_val.jsonl"
+  pairs_test: "data/final_test.jsonl"
+  seeds_for_rl: "data/seed.txt"
+
+sft:
+  epochs: 5
+  batch_size: 4
+  lr: 0.0001
+  max_len: 512
+  max_length: 160
+
+lora:
+  r: 16
+  alpha: 32
+  dropout: 0.05
+  target_modules: ["c_attn", "c_proj"]
+
+checkpoints:
+  sft_comfort: "checkpoints/comfort_large"
+  sft_fear: "checkpoints/fear_large"
+  ppo_comfort: "checkpoints/comfort_large_ppo"
+  ppo_fear: "checkpoints/fear_large_ppo"
+
+ppo:
+  learning_rate: 0.000002      # 2e-6
+  batch_size: 8                # if VRAM is tight, keep 4; 8 is nicer for TRL PPO
+  mini_batch_size: 4
+  ppo_epochs: 2
+  gamma: 0.99                  # short horizon but keep some bootstrapping
+  lam: 0.95
+
+  cliprange: 0.2               # give policy room to move
+  vf_coef: 0.5                 # stronger value head
+  value_clip_range: 0.2        # if your code supports it
+
+  entropy_coef: 0.01           # keeps comfort varied and longer
+  init_kl_coef: 0.02           # start gentle
+  target_kl: 0.1               # looser leash; adapt up/down if you implement scheduler
+
+  # Optional niceties if your trainer supports them:
+  advantage_norm: true
+  reward_normalize: "batch"     # r = (r-mean)/(std+1e-6) pre-GAE
+  max_grad_norm: 1.0
+  lr_schedule: "constant"       # or "cosine" with min_lr: 5e-7

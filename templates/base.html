@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+  <title>{% block title %}Dream IRT{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    html,body{height:100%}
+    .screen{max-width: 64rem; margin: 0 auto; padding: 1rem 1rem 6rem;}
+    .card{background:#0f172a; border:1px solid #1e293b; color:#e2e8f0; border-radius:1rem; padding:1rem;}
+    .chip{padding:.35rem .8rem; border-radius:9999px; background:#e2e8f0; color:#0f172a;}
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-full">
+
+  <!-- Header / Nav -->
+  <header class="sticky top-0 z-40 bg-slate-900/80 backdrop-blur border-b border-slate-700">
+    <div class="max-w-5xl mx-auto px-3 py-3 flex items-center gap-3">
+      <nav class="flex gap-4 text-sm">
+        <a href="/" class="hover:underline">🏠 Home</a>
+        <a href="/write" class="hover:underline">✍️ Write</a>
+        <a href="/rehearse" class="hover:underline">🎧 Rehearse</a>
+        <a href="/rehearsals" class="hover:underline">🎵 Rehearsals</a><!-- NEW in nav -->
+        <a href="/journal" class="hover:underline">📘 Journal</a>
+        <a href="/support" class="hover:underline">💚 Support</a>
+        <a href="/rehearsals" class="hover:underline">🎵 Rehearsals</a>
+
+      </nav>
+
+      <button id="crisisOpen" class="ml-auto px-3 py-1 rounded-full bg-rose-500 text-white">
+        ✨ If you feel unsafe, tap here
+      </button>
+
+      {% if current_user.is_authenticated %}
+        <span class="text-sm text-slate-300 ml-3">{{ current_user.name or current_user.email }}</span>
+        <form method="post" action="/logout" class="ml-2">
+          <button class="px-3 py-1 rounded-xl bg-slate-200 text-slate-900">Logout</button>
+        </form>
+      {% else %}
+        <a href="/login" class="ml-3 px-3 py-1 rounded-xl bg-slate-200 text-slate-900">Login</a>
+        <a href="/signup" class="ml-2 px-3 py-1 rounded-xl bg-emerald-600 text-white">Sign up</a>
+      {% endif %}
+    </div>
+  </header>
+
+  <!-- Page content -->
+  <main class="screen">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Crisis Modal -->
+  <div id="crisisModal" class="fixed inset-0 hidden z-50">
+    <div class="absolute inset-0 bg-slate-900/60"></div>
+    <div class="relative z-10 w-[92%] max-w-lg mx-auto mt-24 rounded-2xl bg-slate-800 text-slate-50 border border-slate-700 p-5 shadow-xl">
+      <h3 class="text-lg font-semibold mb-2">Crisis Support</h3>
+      <p class="mb-3">If you feel unsafe, reach out now:</p>
+      <ul class="list-disc pl-5 space-y-1">
+        <li><span class="font-mono">IN</span> iCall: 9152987821</li>
+        <li><span class="font-mono">US</span> 988 Suicide & Crisis Lifeline</li>
+        <li><span class="font-mono">GB</span> Text “HELLO” to 85258</li>
+      </ul>
+      <div class="mt-4 flex justify-end">
+        <button id="crisisClose" type="button" class="px-4 py-2 rounded-xl bg-slate-200 text-slate-900">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Global non-blocking loader -->
+  <div id="globalLoader" class="fixed inset-0 hidden z-[60]">
+    <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"></div>
+    <div class="relative z-10 h-full grid place-items-center">
+      <div class="rounded-2xl bg-slate-800 border border-slate-700 p-4 shadow-xl flex items-center gap-3">
+        <svg class="animate-spin h-5 w-5 text-emerald-400" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+        </svg>
+        <span data-msg>Working…</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function(){
+      // Crisis modal open/close + Escape + click-outside
+      const modal = document.getElementById('crisisModal');
+      const openBtn = document.getElementById('crisisOpen');
+      const closeBtn = document.getElementById('crisisClose');
+      function open(){ modal.classList.remove('hidden'); document.body.style.overflow='hidden'; }
+      function close(){ modal.classList.add('hidden'); document.body.style.overflow=''; }
+      openBtn?.addEventListener('click', open);
+      closeBtn?.addEventListener('click', close);
+      modal?.addEventListener('click', e => { if (e.target === modal) close(); });
+      window.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+
+      // Global loader helpers
+      const gl = document.getElementById('globalLoader');
+      const msgEl = gl.querySelector('[data-msg]');
+      let count = 0;
+      window.showLoader = (msg="Working…") => { count++; msgEl.textContent = msg; gl.classList.remove('hidden'); };
+      window.hideLoader = () => { count = Math.max(0, count - 1); if (count === 0) gl.classList.add('hidden'); };
+    })();
+  </script>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Dream IRT — Calm App</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  html,body,#root{height:100%}
+  .btn{
+    padding-left: 1rem; /* px-4 */
+    padding-right: 1rem;
+    padding-top: 0.75rem; /* py-3 */
+    padding-bottom: 0.75rem;
+    border-radius: 1rem; /* rounded-2xl */
+    font-size: 1rem; /* text-base */
+    font-weight: 500; /* font-medium */
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); /* shadow-sm */
+    border: 1px solid #e2e8f0; /* border border-slate-200 */
+  }
+  .btn-primary{
+    background-color: #059669; /* bg-emerald-600 */
+    color: #fff; /* text-white */
+    border-color: #059669; /* border-emerald-600 */
+  }
+  .chip{
+    padding-left: 0.75rem; /* px-3 */
+    padding-right: 0.75rem;
+    padding-top: 0.5rem; /* py-2 */
+    padding-bottom: 0.5rem;
+    border-radius: 9999px; /* rounded-full */
+    font-size: 0.875rem; /* text-sm */
+    border: 1px solid #e2e8f0; /* border border-slate-200 */
+  }
+  .card{
+    background-color: #fff; /* bg-white */
+    border-radius: 1rem; /* rounded-2xl */
+    padding: 1rem; /* p-4 */
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); /* shadow-sm */
+    border: 1px solid #f1f5f9; /* border border-slate-100 */
+  }
+  .screen{
+    max-width: 36rem; /* max-w-xl */
+    margin-left: auto; /* mx-auto */
+    margin-right: auto;
+    padding: 1rem; /* p-4 */
+    padding-bottom: 7rem; /* pb-28 */
+  }
+  .focus-text{ line-height: 1.75; }
+  @media (prefers-reduced-motion: no-preference){
+    .breath-dot{ animation: breathe 4s ease-in-out infinite; }
+    @keyframes breathe{0%,100%{transform:scale(.8);opacity:.6}50%{transform:scale(1);opacity:1}}
+  }
+</style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+<div id="root"></div>
+
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script>
+const { useState, useEffect, useRef } = React;
+
+const API_BASE = ""; // same origin
+
+async function api(path, opts={}){
+  const res = await fetch(API_BASE + path, {
+    credentials: "include",
+    headers: {"Content-Type":"application/json", ...(opts.headers||{})},
+    ...opts
+  });
+  if (!res.ok) throw new Error((await res.json()).error || res.statusText);
+  return res.json();
+}
+
+/* ---------- Auth Screens ---------- */
+function AuthView({ onAuthed }){
+  const [mode,setMode]=useState("login");
+  const [email,setEmail]=useState("");
+  const [password,setPassword]=useState("");
+  const [err,setErr]=useState("");
+
+  async function submit(){
+    setErr("");
+    try{
+      const body=JSON.stringify({email,password});
+      const data = await api(`/api/auth/${mode}`,{method:"POST", body});
+      onAuthed(data);
+    }catch(e){ setErr(e.message); }
+  }
+
+  return (
+    <div className="min-h-full grid place-items-center p-6">
+      <div className="card w-full max-w-md">
+        <h1 className="text-2xl font-semibold mb-2">Dream IRT</h1>
+        <p className="text-sm text-slate-500 mb-4">Private, calm, session-based. Local server by default.</p>
+        <div className="space-y-3">
+          <input className="w-full border rounded-xl px-3 py-2" placeholder="Email"
+                 value={email} onChange={e=>setEmail(e.target.value)} />
+          <input className="w-full border rounded-xl px-3 py-2" placeholder="Password" type="password"
+                 value={password} onChange={e=>setPassword(e.target.value)} />
+          {err && <p className="text-rose-600 text-sm">{err}</p>}
+          <button className="btn btn-primary w-full" onClick={submit}>
+            {mode==="login"?"Log in":"Create account"}
+          </button>
+          <button className="btn w-full" onClick={()=>setMode(mode==="login"?"register":"login")}>
+            {mode==="login"?"Need an account? Register":"Have an account? Log in"}
+          </button>
+        </div>
+        <p className="text-xs text-slate-500 mt-4">
+          By continuing you agree this is not emergency care. If unsafe, use the Crisis button.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Breathing Pacer ---------- */
+function BreathPacer({ seconds=30, onDone }){
+  const [t,setT]=useState(seconds);
+  useEffect(()=>{
+    const id=setInterval(()=>setT(x=>x>0?x-1:0),1000);
+    return ()=>clearInterval(id);
+  },[]);
+  useEffect(()=>{ if(t===0 && onDone) onDone(); },[t]);
+  return (
+    <div className="card text-center">
+      <div className="breath-dot w-16 h-16 rounded-full bg-emerald-500/60 mx-auto my-4"></div>
+      <p className="text-lg">Breathe in… and out</p>
+      <p className="text-sm text-slate-500 mt-1">{t}s</p>
+    </div>
+  );
+}
+
+/* ---------- Crisis Pill ---------- */
+function CrisisPill(){
+  function openSheet(){
+    alert("If you feel unsafe: India 112 (Emergency). US 988. Visit befrienders.org for global help.");
+  }
+  return (
+    <button onClick={openSheet}
+      className="fixed bottom-24 right-4 bg-rose-600 text-white px-4 py-2 rounded-full shadow-lg">
+      Crisis
+    </button>
+  );
+}
+
+/* ---------- Home ---------- */
+function Home({ onNav, lastScript }){
+  return (
+    <div className="screen">
+      <h2 className="text-xl font-semibold mb-2">Good to see you</h2>
+      <div className="card mb-4">
+        <p>Ready to rehearse?</p>
+        <div className="mt-3 flex gap-2">
+          <button className="btn btn-primary" onClick={()=>onNav("rehearse")}>Rehearse</button>
+          <button className="btn" onClick={()=>onNav("write")}>New nightmare</button>
+        </div>
+      </div>
+      {lastScript && (
+        <div className="card">
+          <p className="text-sm text-slate-500 mb-1">Last script</p>
+          <p className="line-clamp-3">{lastScript.rewrite}</p>
+          <div className="mt-3">
+            <button className="btn" onClick={()=>onNav("rehearse")}>Open in Rehearse</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------- Write (Capture → Rewrite → Rehearse) ---------- */
+function Write({ onNav }){
+  const [step,setStep]=useState(0); // 0 capture,1 controls+rewrite,2 ready to rehearse
+  const [nightmare,setNightmare]=useState("");
+  const [controls,setControls]=useState({soften:true, helper:false, exit:true});
+  const [rewrite,setRewrite]=useState("");
+  const [loading,setLoading]=useState(false);
+  const [error,setError]=useState("");
+
+  async function getRewrite(){
+    setLoading(true); setError("");
+    try{
+      const data = await api("/api/rewrite",{
+        method:"POST",
+        body: JSON.stringify({ nightmare, controls })
+      });
+      setRewrite(data.text);
+      setStep(2);
+    }catch(e){ setError(e.message); }
+    finally{ setLoading(false); }
+  }
+
+  async function saveAndRehearse(){
+    try{
+      await api("/api/script",{method:"POST", body: JSON.stringify({ nightmare, controls, rewrite })});
+      onNav("rehearse");
+    }catch(e){ alert("Save failed: "+e.message); }
+  }
+
+  return (
+    <div className="screen">
+      <h2 className="text-xl font-semibold mb-3">Write</h2>
+
+      {step===0 && (
+        <>
+          <BreathPacer seconds={30}/>
+          <div className="card mt-4">
+            <label className="text-sm text-slate-500">What happened? What was the scariest moment? What would you change to feel safer?</label>
+            <textarea className="w-full border rounded-xl px-3 py-2 mt-2 min-h-[140px]"
+              placeholder="Type here…" value={nightmare} onChange={e=>setNightmare(e.target.value)} />
+            <div className="mt-3 flex justify-between">
+              <button className="btn" onClick={()=>setStep(1)} disabled={!nightmare.trim()}>Next</button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {step===1 && (
+        <div className="card">
+          <p className="mb-2">Controls</p>
+          <div className="flex flex-wrap gap-2">
+            <button className={"chip "+(controls.soften?"bg-emerald-50":"")} onClick={()=>setControls(c=>({...c,soften:!c.soften}))}>Soften threat</button>
+            <button className={"chip "+(controls.helper?"bg-emerald-50":"")} onClick={()=>setControls(c=>({...c,helper:!c.helper}))}>Add helper</button>
+            <button className={"chip "+(controls.exit?"bg-emerald-50":"")} onClick={()=>setControls(c=>({...c,exit:!c.exit}))}>Exit door</button>
+          </div>
+          <div className="mt-4 flex gap-2">
+            <button className="btn" onClick={()=>setStep(0)}>Back</button>
+            <button className="btn btn-primary" onClick={getRewrite} disabled={loading}>
+              {loading?"Generating…":"Generate rewrite"}
+            </button>
+          </div>
+          {error && <p className="text-rose-600 text-sm mt-2">{error}</p>}
+        </div>
+      )}
+
+      {step===2 && (
+        <div className="space-y-3">
+          <div className="card">
+            <p className="text-sm text-slate-500 mb-1">Your New Script (editable)</p>
+            <textarea className="w-full border rounded-xl px-3 py-2 min-h-[180px]"
+              value={rewrite} onChange={e=>setRewrite(e.target.value)} />
+          </div>
+          <div className="flex gap-2">
+            <button className="btn" onClick={()=>setStep(1)}>Back</button>
+            <button className="btn btn-primary" onClick={saveAndRehearse}>Save & Rehearse</button>
+          </div>
+        </div>
+      )}
+      <CrisisPill/>
+    </div>
+  );
+}
+
+/* ---------- Storyboard (4–6 panels) ---------- */
+function Storyboard(){
+  const [panels,setPanels]=useState(["","","",""]);
+  function addPanel(){ if(panels.length<6) setPanels([...panels,""]); }
+  function rmPanel(i){ const a=[...panels]; a.splice(i,1); setPanels(a); }
+  function move(i,dir){ const a=[...panels]; const j=i+dir; if(j<0||j>=a.length) return; [a[i],a[j]]=[a[j],a[i]]; setPanels(a); }
+  return (
+    <div className="screen">
+      <h2 className="text-xl font-semibold mb-3">Storyboard</h2>
+      <div className="space-y-3">
+        {panels.map((t,i)=>(
+          <div className="card" key={i}>
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm">Panel {i+1}</span>
+              <div className="flex gap-2">
+                <button className="chip" onClick={()=>move(i,-1)}>↑</button>
+                <button className="chip" onClick={()=>move(i,+1)}>↓</button>
+                <button className="chip" onClick={()=>rmPanel(i)}>Delete</button>
+              </div>
+            </div>
+            <textarea className="w-full border rounded-xl px-3 py-2"
+              placeholder="Text (optional image prompt note)…"
+              value={t} onChange={e=>{ const a=[...panels]; a[i]=e.target.value; setPanels(a);} } />
+          </div>
+        ))}
+        <button className="btn" onClick={addPanel} disabled={panels.length>=6}>Add panel</button>
+        <p className="text-sm text-slate-500">The model can fill transitions between panels later.</p>
+      </div>
+      <CrisisPill/>
+    </div>
+  );
+}
+
+/* ---------- Rehearse (focus + TTS) ---------- */
+function Rehearse(){
+  const [scripts,setScripts]=useState([]);
+  const [idx,setIdx]=useState(0);
+  const [line,setLine]=useState(0);
+  const [lines,setLines]=useState([]);
+  const audioRef = useRef(null);
+
+  useEffect(()=>{ (async()=>{
+    const list=await api("/api/script");
+    setScripts(list);
+    if(list[0]) setLines(splitLines(list[0].rewrite));
+  })(); },[]);
+
+  function splitLines(text){
+    return (text||"").split(/(?<=[.!?])\s+/).filter(Boolean);
+  }
+
+  function selectScript(i){
+    setIdx(i); setLine(0); setLines(splitLines(scripts[i].rewrite));
+  }
+
+  async function speakCurrent(){
+    const text = lines[line] || "";
+    const { url } = await api("/api/tts",{method:"POST", body: JSON.stringify({text})});
+    audioRef.current.src = url; audioRef.current.play();
+  }
+
+  return (
+    <div className="screen">
+      <h2 className="text-xl font-semibold mb-3">Rehearse</h2>
+      <div className="card mb-3">
+        <p className="text-sm text-slate-500">Pick a script</p>
+        <div className="mt-2 flex gap-2 overflow-x-auto">
+          {scripts.map((s,i)=>(
+            <button key={s.id}
+              className={"chip "+(i===idx?"bg-emerald-50":"")}
+              onClick={()=>selectScript(i)}>Script {s.id}</button>
+          ))}
+        </div>
+      </div>
+      <div className="card">
+        <p className="focus-text text-lg min-h-[140px]">{lines[line]||"No script yet. Save one from Write."}</p>
+        <div className="mt-3 flex gap-2">
+          <button className="btn" onClick={()=>setLine(l=>Math.max(0,l-1))}>Back</button>
+          <button className="btn btn-primary" onClick={()=>setLine(l=>Math.min(lines.length-1,l+1))}>Next line</button>
+          <button className="btn" onClick={speakCurrent}>Listen</button>
+          <audio ref={audioRef}></audio>
+        </div>
+      </div>
+      <CrisisPill/>
+    </div>
+  );
+}
+
+/* ---------- Journal ---------- */
+function Journal(){
+  const [sleep_quality,setSQ]=useState(3);
+  const [ni,setNI]=useState(3);
+  const [emotions,setEmo]=useState("");
+  const [note,setNote]=useState("");
+  const [list,setList]=useState([]);
+
+  async function load(){ setList(await api("/api/journal")); }
+  useEffect(()=>{ load(); },[]);
+
+  async function save(){
+    await api("/api/journal",{method:"POST", body: JSON.stringify({
+      sleep_quality, nightmare_intensity: ni, emotions, note
+    })});
+    setEmo(""); setNote(""); await load();
+  }
+
+  return (
+    <div className="screen">
+      <h2 className="text-xl font-semibold mb-3">Journal</h2>
+      <div className="card mb-4 space-y-3">
+        <div>
+          <label className="text-sm">Sleep quality: {sleep_quality}</label>
+          <input type="range" min="1" max="5" value={sleep_quality}
+            onChange={e=>setSQ(+e.target.value)} className="w-full"/>
+        </div>
+        <div>
+          <label className="text-sm">Nightmare intensity: {ni}</label>
+          <input type="range" min="1" max="5" value={ni}
+            onChange={e=>setNI(+e.target.value)} className="w-full"/>
+        </div>
+        <input className="w-full border rounded-xl px-3 py-2" placeholder="Emotions (optional)"
+               value={emotions} onChange={e=>setEmo(e.target.value)} />
+        <textarea className="w-full border rounded-xl px-3 py-2" placeholder="Note (optional)"
+               value={note} onChange={e=>setNote(e.target.value)} ></textarea>
+        <button className="btn btn-primary" onClick={save}>Save</button>
+      </div>
+      <div className="space-y-2">
+        {list.map(e=>(
+          <div className="card" key={e.id}>
+            <p className="text-sm text-slate-500">{new Date(e.created_at).toLocaleString()}</p>
+            <p>Sleep {e.sleep_quality}/5, Intensity {e.nightmare_intensity}/5</p>
+            {e.emotions && <p>Emotions: {e.emotions}</p>}
+            {e.note && <p className="text-slate-700">{e.note}</p>}
+          </div>
+        ))}
+      </div>
+      <CrisisPill/>
+    </div>
+  );
+}
+
+/* ---------- Support ---------- */
+function Support(){
+  const [info,setInfo]=useState(null);
+  useEffect(()=>{ api("/api/support/crisis").then(setInfo).catch(()=>{}); },[]);
+  return (
+    <div className="screen">
+      <h2 className="text-xl font-semibold mb-3">Support</h2>
+      <div className="card">
+        <p className="mb-2">{info?.notice || "If you feel unsafe, contact local emergency services."}</p>
+        <div className="space-y-2">
+          <div>
+            <p className="text-sm font-medium">Phone</p>
+            <ul className="list-disc pl-5">
+              {(info?.phone||[]).map((p,i)=><li key={i}>{p.label}</li>)}
+            </ul>
+          </div>
+          <div>
+            <p className="text-sm font-medium">Chat</p>
+            <ul className="list-disc pl-5">
+              {(info?.chat||[]).map((c,i)=><li key={i}><a className="text-emerald-700 underline" href={c.url} target="_blank"> {c.label}</a></li>)}
+            </ul>
+          </div>
+        </div>
+      </div>
+      <CrisisPill/>
+    </div>
+  );
+}
+
+/* ---------- App Shell with Nav ---------- */
+function App(){
+  const [me,setMe]=useState(null);
+  const [tab,setTab]=useState("home");
+
+  useEffect(()=>{ api("/api/auth/me").then(r=>setMe(r.user)); },[]);
+
+  async function logout(){ await api("/api/auth/logout",{method:"POST"}); setMe(null); }
+
+  if(!me) return <AuthView onAuthed={()=>api("/api/auth/me").then(r=>setMe(r.user))}/>;
+
+  return (
+    <div className="min-h-full pb-20">
+      <header className="sticky top-0 bg-slate-50/80 backdrop-blur border-b border-slate-200 p-3 flex justify-between">
+        <div className="font-semibold">Dream IRT</div>
+        <button className="chip" onClick={logout}>Logout</button>
+      </header>
+
+      {tab==="home" && <Home onNav={setTab} />}
+      {tab==="write" && <Write onNav={setTab} />}
+      {tab==="story" && <Storyboard/>}
+      {tab==="rehearse" && <Rehearse/>}
+      {tab==="journal" && <Journal/>}
+      {tab==="support" && <Support/>}
+
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200">
+        <div className="max-w-xl mx-auto grid grid-cols-5">
+          {[
+            ["home","Home"],["write","Write"],["story","Storyboard"],
+            ["rehearse","Rehearse"],["journal","Journal"]
+          ].map(([k,label])=>(
+            <button key={k} className={"py-3 "+(tab===k?"text-emerald-700":"text-slate-600")}
+                    onClick={()=>setTab(k)}>{label}</button>
+          ))}
+        </div>
+        <div className="max-w-xl mx-auto px-4 pb-3">
+          <button className="w-full btn mt-2" onClick={()=>setTab("support")}>Support</button>
+        </div>
+      </nav>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>

@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Rehearse — Dream IRT{% endblock %}
+{% block content %}
+  <div class="card">
+    <p class="text-sm text-slate-400 mb-2">Line-by-line focus mode</p>
+
+    <div id="emptyState" class="hidden">
+      <p class="text-slate-300 mb-3">
+        No script found yet. Create one in <a href="/write" class="underline text-emerald-300">Write</a>.
+      </p>
+      <button id="tryLoad" class="px-4 py-2 rounded-xl bg-slate-200 text-slate-900">Try loading again</button>
+    </div>
+
+    <div id="reader" class="hidden">
+      <div id="content" class="text-2xl leading-9 min-h-[140px]"></div>
+
+      <div class="mt-4 flex gap-2 flex-wrap">
+        <button id="back" class="px-4 py-2 rounded-xl bg-slate-200 text-slate-900">Back</button>
+        <button id="next" class="px-4 py-2 rounded-xl bg-emerald-600 text-white">Next line</button>
+        <button id="listen" class="px-4 py-2 rounded-xl bg-slate-200 text-slate-900">Listen</button>
+        <button id="saveAll" class="px-4 py-2 rounded-xl bg-emerald-700 text-white">Save rehearsal</button>
+      </div>
+
+      <audio id="audio" class="mt-4 w-full" controls></audio>
+
+      <p class="mt-3 text-sm text-slate-400">
+        Saved items are in <a href="/rehearsals" class="underline text-emerald-300">Rehearsal Library</a>.
+      </p>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+  const $ = (id)=>document.getElementById(id);
+  let lines = [], i = 0;
+
+  function splitSentences(txt){
+    return (txt || "").replace(/\s+/g, " ").trim().split(/(?<=[.!?])\s+/).filter(Boolean);
+  }
+
+  async function fetchWithTimeout(url, opts={}, ms=30000){
+    const ctrl = new AbortController(); const t = setTimeout(()=>ctrl.abort(), ms);
+    try { const r = await fetch(url, { ...opts, signal: ctrl.signal }); clearTimeout(t); return r; }
+    catch(e){ clearTimeout(t); throw e; }
+  }
+
+  function showEmpty(){ $("emptyState").classList.remove("hidden"); $("reader").classList.add("hidden"); }
+  function showReader(){ $("emptyState").classList.add("hidden"); $("reader").classList.remove("hidden"); }
+  function render(){
+    $("content").textContent = lines[i] || "";
+    $("back").disabled = (i === 0);
+    $("next").disabled = (i >= lines.length - 1);
+    $("listen").disabled = !lines[i];
+    $("saveAll").disabled = !lines.length;
+  }
+
+  async function loadScript(){
+    let txt = "";
+    try { txt = localStorage.getItem("last_script") || ""; } catch {}
+    if (!txt){
+      try { const r = await fetchWithTimeout("/get_last_script"); const j = await r.json(); txt = (j.script || "").trim(); } catch {}
+    }
+    if (!txt){ showEmpty(); return; }
+    lines = splitSentences(txt);
+    if (!lines.length){ showEmpty(); return; }
+    i = 0; showReader(); render();
+  }
+
+  $("tryLoad").onclick = loadScript;
+
+  $("back").onclick = ()=>{ if (i>0){ i--; render(); } };
+  $("next").onclick = ()=>{
+    if (i < lines.length-1) {
+      $("content").textContent = "Breathe in… out…";
+      setTimeout(()=>{ i++; render(); }, 700);
+    }
+  };
+
+  $("listen").onclick = async ()=>{
+    const line = lines[i] || "";
+    if (!line) return;
+    try{
+      showLoader?.("Preparing audio…");
+      // TTS the exact visible line
+      const r = await fetchWithTimeout("/tts", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ text: line })
+      }, 30000);
+      const j = await r.json();
+      if (j.error || !j.audio_base64) throw new Error(j.error || "TTS unavailable");
+      const audio = $("audio");
+      const mime = j.audio_mime || "audio/mpeg";
+      audio.src = `data:${mime};base64,` + j.audio_base64;
+      audio.play().catch(()=>{});
+    } catch(e){
+      // Browser TTS fallback
+      try { const u=new SpeechSynthesisUtterance(line); u.rate=0.95; u.lang="en-US"; speechSynthesis.speak(u); }
+      catch(_){ alert("Audio not available right now. Please read the line silently."); }
+    } finally {
+      hideLoader?.();
+    }
+  };
+
+  // Save entire script as one audio file on the server (with pauses)
+  $("saveAll").onclick = async ()=>{
+    const script = lines.join(" ");
+    if (!script) return alert("No script to save.");
+    try{
+      showLoader?.("Generating and saving audio…");
+      const j = await (await fetchWithTimeout("/rehearsal/save", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ script_text: script, title: "IRT Rehearsal", pause_ms: 800 })
+      }, 120000)).json();
+      if (j.error) return alert(j.error);
+      alert("Saved! Open your Rehearsal Library to play it later.");
+    } catch(e){
+      alert(e.message || "Could not save rehearsal. Try again.");
+    } finally {
+      hideLoader?.();
+    }
+  };
+
+  loadScript();
+})();
+</script>
+{% endblock %}

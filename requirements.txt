@@ -1,0 +1,30 @@
+torch>=2.2.0
+transformers==4.42.0
+accelerate>=0.28.0
+peft==0.11.1
+trl==0.9.6
+scikit-learn==1.5.1
+numpy>=1.26
+pandas>=2.2
+tqdm>=4.66
+matplotlib>=3.8
+PyYAML>=6.0
+nltk>=3.9
+streamlit>=1.25
+pydantic>=1.10
+Pillow
+scikit-image
+moviepy
+insightface
+opencv-python
+diffusers[torch]>=0.25.0
+# Optional: ComfyUI/Ollama client
+requests
+# Safety
+profanity-check
+# Utilities
+python-dotenv
+# Windows-specific
+colorama
+# Testing
+pytest

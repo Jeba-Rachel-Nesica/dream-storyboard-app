@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Sign up — Dream IRT{% endblock %}
+{% block content %}
+  <div class="card max-w-md mx-auto">
+    <h1 class="text-xl font-semibold mb-3">Create your account</h1>
+    <form method="post" action="/signup" class="grid gap-3">
+      <input name="name" placeholder="Name (optional)" class="rounded-xl bg-slate-900 border border-slate-700 p-2">
+      <input name="email" type="email" required placeholder="Email" class="rounded-xl bg-slate-900 border border-slate-700 p-2">
+      <input name="password" type="password" required placeholder="Password" class="rounded-xl bg-slate-900 border border-slate-700 p-2">
+      <button class="px-4 py-2 rounded-xl bg-emerald-600 text-white">Create account</button>
+      <p class="text-sm text-slate-400">Already have an account? <a href="/login" class="underline text-emerald-300">Login</a></p>
+    </form>
+  </div>
+{% endblock %}

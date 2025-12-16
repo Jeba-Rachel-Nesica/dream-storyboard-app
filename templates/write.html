@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% block title %}Write — Dream IRT{% endblock %}
+{% block content %}
+  <!-- 30s breathing pacer -->
+  <div class="card mb-4" id="pacer">
+    <div class="w-16 h-16 rounded-full bg-emerald-500/60 mx-auto my-3" style="animation:breathe 4s ease-in-out infinite"></div>
+    <p class="text-center">Breathe in… and out</p>
+    <style>@keyframes breathe{0%,100%{transform:scale(.8);opacity:.6}50%{transform:scale(1);opacity:1}}</style>
+  </div>
+
+  <div class="card">
+    <label class="text-slate-300">What happened? Most distressing moment? What would you change to feel safer?</label>
+    <textarea id="nightmare" class="w-full mt-2 rounded-xl bg-slate-900 border border-slate-700 p-3 min-h-[140px]" placeholder="Type your dream here…"></textarea>
+
+    <!-- IRT control chips -->
+    <div class="mt-3 flex flex-wrap gap-2">
+      <button id="btn-soften" class="chip">Soften threat</button>
+      <button id="btn-helper" class="chip">Add helper</button>
+      <button id="btn-exit"   class="chip">Exit door</button>
+    </div>
+
+    <!-- Text mode generate -->
+    <div class="mt-3 flex gap-2">
+      <button id="gen" class="px-4 py-2 rounded-xl bg-emerald-600 text-white">Generate rewrite (text)</button>
+    </div>
+
+    <!-- Voice controls: START / STOP -->
+    <div class="mt-4 border-t border-slate-700 pt-4">
+      <p class="text-sm text-slate-400 mb-2">Or record your nightmare verbally:</p>
+      <div class="flex items-center gap-2 flex-wrap">
+        <button id="recStart" class="px-4 py-2 rounded-xl bg-slate-200 text-slate-900">Start recording</button>
+        <button id="recStop"  class="px-4 py-2 rounded-xl bg-slate-600 text-white disabled:opacity-50" disabled>Stop & transcribe</button>
+        <span id="recBadge" class="px-2 py-1 rounded-full text-xs bg-slate-700 text-slate-200">Ready</span>
+      </div>
+      <div id="recDot" class="mt-2 w-3 h-3 rounded-full bg-rose-500 opacity-0"></div>
+      <style>
+        @keyframes pulse { 0%,100%{transform:scale(.9);opacity:.6} 50%{transform:scale(1.2);opacity:1} }
+        .dot-pulse{ animation:pulse 1.2s ease-in-out infinite; }
+      </style>
+    </div>
+
+    <!-- Result -->
+    <div id="result" class="mt-4 hidden">
+      <p class="text-sm text-slate-400 mb-1">Your New Script (editable)</p>
+      <textarea id="comfort" class="w-full rounded-xl bg-slate-900 border border-slate-700 p-3 min-h-[160px]"></textarea>
+      <div class="mt-3 flex gap-2">
+        <button id="listen" class="px-4 py-2 rounded-xl bg-slate-200 text-slate-900">Listen</button>
+        <a href="/rehearse" class="px-4 py-2 rounded-xl bg-emerald-600 text-white">Rehearse</a>
+      </div>
+      <audio id="audio" class="mt-3" controls></audio>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+  const $ = (id)=>document.getElementById(id);
+
+  // ---- helper: fetch with timeout ----
+  async function fetchWithTimeout(url, opts = {}, ms = 45000) {
+    const ctrl = new AbortController(); const t = setTimeout(()=>ctrl.abort(), ms);
+    try { const res = await fetch(url, { ...opts, signal: ctrl.signal }); clearTimeout(t); return res; }
+    catch(e){ clearTimeout(t); if (e.name==="AbortError") throw new Error("The server is taking too long. Please try again."); throw e; }
+  }
+
+  // ---- IRT controls (sent as hints if you wire them server-side later) ----
+  let controls = { soften:true, helper:false, exit:true };
+  function toggle(btn,key){ controls[key] = !controls[key]; btn.classList.toggle("bg-emerald-200"); btn.classList.toggle("text-slate-900"); }
+  $("btn-soften").onclick = ()=>toggle($("btn-soften"),"soften");
+  $("btn-helper").onclick = ()=>toggle($("btn-helper"),"helper");
+  $("btn-exit").onclick   = ()=>toggle($("btn-exit"),"exit");
+
+  // -------- TEXT MODE with loader + timeout --------
+  $("gen").onclick = async ()=>{
+    const nightmare = $("nightmare").value.trim();
+    if(!nightmare) return alert("Please describe your dream.");
+    try{
+      showLoader("Rewriting…");
+      const res = await fetchWithTimeout("/rewrite", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ mode:"text", nightmare, controls })
+      }, 45000);
+      const r = await res.json();
+      if (r.error) return alert(r.error);
+
+      $("comfort").value = r.comfort_text || "";
+      localStorage.setItem("last_script", r.comfort_text || "");
+      $("result").classList.remove("hidden");
+
+      // Save TTS with mime
+      window._last_tts = { b64: r.comfort_audio_base64 || "", mime: r.comfort_audio_mime || "audio/mpeg" };
+    } catch (e) {
+      alert(e.message || "Network error");
+    } finally {
+      hideLoader();
+    }
+  };
+
+  $("listen").onclick = ()=>{
+    const audio = $("audio");
+    const tts = window._last_tts || {};
+    if (tts.b64){
+      audio.src = `data:${tts.mime || "audio/mpeg"};base64,` + tts.b64;
+      audio.play().catch(()=>{});
+    } else {
+      alert("Generate a rewrite first.");
+    }
+  };
+
+  // -------- VOICE MODE: Start / Stop with loader + timeout + auto-stop --------
+  let mediaStream = null, recorder = null, chunks = [], autoStopTimer = null;
+
+  function setRecUI(state){
+    if (state === "recording"){
+      $("recStart").disabled = true; $("recStop").disabled = false;
+      $("recBadge").textContent = "Recording…";
+      $("recBadge").className = "px-2 py-1 rounded-full text-xs bg-rose-600 text-white";
+      $("recDot").classList.add("dot-pulse"); $("recDot").style.opacity = 1;
+    } else if (state === "processing"){
+      $("recStart").disabled = true; $("recStop").disabled = true;
+      $("recBadge").textContent = "Processing…";
+      $("recBadge").className = "px-2 py-1 rounded-full text-xs bg-amber-600 text-white";
+      $("recDot").classList.remove("dot-pulse"); $("recDot").style.opacity = 0;
+    } else {
+      $("recStart").disabled = false; $("recStop").disabled = true;
+      $("recBadge").textContent = "Ready";
+      $("recBadge").className = "px-2 py-1 rounded-full text-xs bg-slate-700 text-slate-200";
+      $("recDot").classList.remove("dot-pulse"); $("recDot").style.opacity = 0;
+    }
+  }
+  setRecUI("ready");
+
+  $("recStart").onclick = async ()=>{
+    try{
+      mediaStream = await navigator.mediaDevices.getUserMedia({
+        audio:{ noiseSuppression:true, echoCancellation:true, autoGainControl:true, channelCount:1, sampleRate:48000 }
+      });
+      let mime = "audio/webm;codecs=opus";
+      if (!MediaRecorder.isTypeSupported(mime)) mime = "audio/webm";
+      if (!MediaRecorder.isTypeSupported(mime)) mime = "";
+      recorder = new MediaRecorder(mediaStream, mime ? { mimeType: mime } : undefined);
+      chunks = [];
+      recorder.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+      recorder.start();
+      // HARD CAP 15s
+      autoStopTimer = setTimeout(()=>{ try{ recorder.stop(); }catch{} }, 15000);
+      setRecUI("recording");
+    }catch(e){
+      alert("Microphone error: " + e.message);
+      setRecUI("ready");
+    }
+  };
+
+  $("recStop").onclick = async ()=>{
+    if (!recorder) return;
+    setRecUI("processing"); showLoader("Transcribing speech…");
+    const stopped = new Promise(res => { recorder.onstop = res; });
+    try { clearTimeout(autoStopTimer); } catch {}
+    try { recorder.stop(); } catch {}
+    await stopped;
+    try { mediaStream.getTracks().forEach(t => t.stop()); } catch {}
+
+    const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
+    const b64 = await new Promise(res=>{ const fr=new FileReader(); fr.onloadend=()=>res(fr.result.split(",")[1]); fr.readAsDataURL(blob); });
+
+    try{
+      const res = await fetchWithTimeout("/rewrite", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+          mode:"voice",
+          audio_base64: b64,
+          audio_mime: blob.type || "audio/webm",
+          controls
+        })
+      }, 60000); // allow ASR + rewrite + TTS
+      const r = await res.json();
+      if (r.error) return alert(r.error);
+
+      $("nightmare").value = r.asr_text || "";
+      $("comfort").value   = r.comfort_text || "";
+      localStorage.setItem("last_script", r.comfort_text || "");
+      $("result").classList.remove("hidden");
+
+      // Save TTS with mime
+      window._last_tts = { b64: r.comfort_audio_base64 || "", mime: r.comfort_audio_mime || "audio/mpeg" };
+    } catch (e) {
+      alert(e.message || "Transcription failed. Please try again.");
+    } finally {
+      hideLoader(); setRecUI("ready"); recorder=null; mediaStream=null; chunks=[];
+    }
+  };
+})();
+</script>
+{% endblock %}

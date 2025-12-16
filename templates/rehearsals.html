@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Saved Rehearsals — Dream IRT{% endblock %}
+{% block content %}
+  <div class="card">
+    <h2 class="text-xl font-semibold mb-3">Saved Rehearsals</h2>
+    <p class="text-slate-300 mb-3">These are audio rehearsals you saved from the Rehearse screen.</p>
+    <div id="list" class="space-y-3"></div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(async function () {
+  const list = document.getElementById("list");
+
+  function timefmt(s){ try{ return new Date(s).toLocaleString(); }catch{ return s; } }
+
+  async function fetchWithTimeout(url, opts={}, ms=20000){
+    const c=new AbortController(); const to=setTimeout(()=>c.abort(),ms);
+    try{ const r=await fetch(url,{...opts,signal:c.signal}); clearTimeout(to); return r; }
+    catch(e){ clearTimeout(to); throw e; }
+  }
+
+  async function load(){
+    const rows = await (await fetchWithTimeout("/rehearsal/list")).json();
+    if (!rows.length){
+      list.innerHTML = `
+        <p class="text-slate-300">
+          No saved rehearsals yet. Go to <a class="underline text-emerald-300" href="/rehearse">Rehearse</a> and tap <b>Save rehearsal</b>.
+        </p>`;
+      return;
+    }
+
+    list.innerHTML = rows.map(r => `
+      <div class="card">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div>
+            <div class="font-semibold">${r.title}</div>
+            <div class="text-sm text-slate-400">${timefmt(r.created_at)} • ${r.duration_s || "?"}s</div>
+            <div class="text-sm mt-1">
+              ${r.has_file
+                ? `<a class="underline text-emerald-300" href="${r.url}" download>Download WAV</a>`
+                : `<span class="text-rose-300">Audio file missing</span>`}
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button data-play="${r.id}" class="px-3 py-1 rounded-xl bg-slate-200 text-slate-900" ${r.has_file ? "" : "disabled"}>Play</button>
+            <audio id="audio-${r.id}" preload="none" class="w-72"></audio>
+          </div>
+        </div>
+      </div>
+    `).join("");
+
+    // Play: fetch blob -> object URL -> assign to audio.src
+    list.querySelectorAll("[data-play]").forEach(btn=>{
+      btn.addEventListener("click", async ()=>{
+        const id = btn.getAttribute("data-play");
+        const audioEl = document.getElementById(`audio-${id}`);
+        try{
+          btn.disabled = true; btn.textContent = "Loading…";
+          const resp = await fetchWithTimeout(`/rehearsal/${id}/audio`, {}, 60000);
+          if (!resp.ok) throw new Error(`Server ${resp.status}`);
+          const blob = await resp.blob();
+          const url  = URL.createObjectURL(blob);
+          audioEl.src = url;
+          audioEl.controls = true;
+          await audioEl.play().catch(()=>{});
+          btn.textContent = "Play";
+        }catch(e){
+          alert("Could not play this rehearsal. " + (e.message || e));
+          btn.textContent = "Play";
+        }finally{
+          btn.disabled = false;
+        }
+      });
+    });
+  }
+
+  try { await load(); }
+  catch(e){ list.innerHTML = `<p class="text-rose-300">Error: ${e.message || e}</p>`; }
+})();
+</script>
+{% endblock %}
