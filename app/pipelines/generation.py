@@ -3,7 +3,7 @@ from PIL import Image
 import torch
 from diffusers import StableDiffusionImg2ImgPipeline, StableDiffusionPipeline
 import random
-from app.pipelines.identity import compute_face_similarity
+from pipelines.identity import compute_face_similarity
 
 # Provider interface: can swap to ComfyUI/Ollama if needed
 class DiffusionProvider:

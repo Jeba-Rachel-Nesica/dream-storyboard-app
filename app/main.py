@@ -1,7 +1,7 @@
 import streamlit as st
-from app.ui import upload, script_input, beats_editor, frame_generator, video_export
-from app.storage import state
-from app.pipelines.safety import show_disclaimer
+from ui import upload, script_input, beats_editor, frame_generator, video_export
+from storage import state
+from pipelines.safety import show_disclaimer
 
 st.set_page_config(page_title="Dream Storyboard Video Generator", layout="wide")
 

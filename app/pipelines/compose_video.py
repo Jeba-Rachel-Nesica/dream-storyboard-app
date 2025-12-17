@@ -1,6 +1,6 @@
 import os
 import moviepy.editor as mpy
-from app.storage import paths
+from storage import paths
 
 def compose_video(frames, beats, out_path=None, duration=2.0, crossfade=0.4):
     clips = []
