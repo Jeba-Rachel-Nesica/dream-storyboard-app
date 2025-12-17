@@ -1,13 +1,13 @@
 # Core ML/AI
 torch>=2.2.0
-transformers==4.42.0
 accelerate>=0.28.0
 peft>=0.17.0
 trl==0.9.6
-diffusers[torch]>=0.25.0
+diffusers>=0.25.0
+transformers>=4.38.0
 
 # Data Science
-numpy>=1.26
+numpy==1.26.4
 pandas>=2.2
 scikit-learn==1.5.1
 scipy>=1.11.0
@@ -19,12 +19,17 @@ nltk>=3.9
 opencv-python>=4.8.0
 opencv-python-headless>=4.8.0
 insightface>=0.7.3
+onnxruntime>=1.16.0  
 Pillow>=10.0.0
 scikit-image>=0.22.0
 imageio-ffmpeg>=0.4.9
 
+# Advanced face/identity control (optional but recommended)
+ip-adapter>=0.1.0
+controlnet-aux>=0.0.7
+
 # Video Processing
-moviepy>=1.0.3
+moviepy==1.0.3
 
 # Web Frameworks
 streamlit>=1.25

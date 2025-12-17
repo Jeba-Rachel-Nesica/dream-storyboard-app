@@ -5,6 +5,14 @@ from diffusers import StableDiffusionImg2ImgPipeline, StableDiffusionPipeline
 import random
 from app.pipelines.identity import compute_face_similarity
 
+# Try to import IP-Adapter for better identity preservation
+try:
+    from ip_adapter import IPAdapter
+    IP_ADAPTER_AVAILABLE = True
+except ImportError:
+    IP_ADAPTER_AVAILABLE = False
+    print("[Warning] IP-Adapter not available. Using standard img2img.")
+
 # Provider interface: can swap to ComfyUI/Ollama if needed
 class DiffusionProvider:
     def __init__(self, model_path=None, device=None):
@@ -20,12 +28,13 @@ class DiffusionProvider:
         if self.pipe is None:
             self.pipe = StableDiffusionPipeline.from_pretrained(self.model_path).to(self.device)
 
-    def generate(self, prompt, negative_prompt, seed, ref_img=None, face_emb=None):
+    def generate(self, prompt, negative_prompt, seed, ref_img=None, face_emb=None, strength=0.5):
         self._lazy_load()
         generator = torch.Generator(self.device).manual_seed(seed)
         if ref_img is not None:
             img_pipe = StableDiffusionImg2ImgPipeline.from_pretrained(self.model_path).to(self.device)
-            img = img_pipe(prompt=prompt, negative_prompt=negative_prompt, image=ref_img, strength=0.7, guidance_scale=7.5, generator=generator).images[0]
+            # Lower strength (0.5 instead of 0.7) for better identity preservation
+            img = img_pipe(prompt=prompt, negative_prompt=negative_prompt, image=ref_img, strength=strength, guidance_scale=7.5, generator=generator).images[0]
         else:
             img = self.pipe(prompt=prompt, negative_prompt=negative_prompt, guidance_scale=7.5, generator=generator).images[0]
         return img
@@ -33,14 +42,22 @@ class DiffusionProvider:
 provider = DiffusionProvider()
 
 def generate_candidates(beat, identity, n=3):
+    from PIL import Image
     imgs = []
+    ref_img = identity['best_crop']
+    # Ensure ref_img is a PIL.Image.Image
+    if not isinstance(ref_img, (Image.Image, np.ndarray)):
+        try:
+            ref_img = Image.open(ref_img)
+        except Exception:
+            ref_img = None
     for i in range(n):
         seed = random.randint(0, 2**32-1)
         img = provider.generate(
             prompt=beat['positive_prompt'],
             negative_prompt=beat['negative_prompt'],
             seed=seed,
-            ref_img=identity['best_crop'],
+            ref_img=ref_img,
             face_emb=identity['agg_embedding']
         )
         imgs.append((img, {'seed': seed}))

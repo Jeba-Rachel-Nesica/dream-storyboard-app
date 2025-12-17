@@ -37,9 +37,21 @@ def detect_and_embed_faces(uploaded_files):
             return False, "Each photo must contain exactly one clear face."
         emb = faces[0].embedding / np.linalg.norm(faces[0].embedding)
         embeddings.append(emb)
-        # Crop face
+        # Crop upper body (expand bbox for better context)
         x1, y1, x2, y2 = faces[0].bbox.astype(int)
-        crop = img[y1:y2, x1:x2]
+        h, w = img.shape[:2]
+        
+        # Expand to upper body: 2.5x height, 2x width
+        face_h = y2 - y1
+        face_w = x2 - x1
+        
+        # Calculate expanded crop with padding
+        crop_y1 = max(0, y1 - int(face_h * 0.3))  # Include some head space
+        crop_y2 = min(h, y2 + int(face_h * 1.5))  # Extend down to shoulders/chest
+        crop_x1 = max(0, x1 - int(face_w * 0.5))  # Expand width
+        crop_x2 = min(w, x2 + int(face_w * 0.5))  # Expand width
+        
+        crop = img[crop_y1:crop_y2, crop_x1:crop_x2]
         crops.append(crop)
     agg_emb = np.mean(embeddings, axis=0)
     agg_emb = agg_emb / np.linalg.norm(agg_emb)

@@ -10,11 +10,20 @@ def video_export():
     if not keyframes:
         st.info("Select keyframes first.")
         return
+    from PIL import Image
     style = st.text_input("Style preset", "abstract dreamy watercolor, soft gradients, calming, low detail")
     styled = []
     for i, kf in enumerate(keyframes):
         st.subheader(f"Beat {i+1}")
-        img = stylize_img2img(kf['img'], style)
+        img_in = kf['img']
+        # Ensure input is a PIL.Image.Image
+        if not isinstance(img_in, Image.Image):
+            try:
+                img_in = Image.open(img_in)
+            except Exception:
+                st.error("Could not open image for stylization.")
+                continue
+        img = stylize_img2img(img_in, style)
         st.image(img, caption="Styled Frame", use_column_width=True)
         styled.append(img)
     state.save_styled_frames(styled)
