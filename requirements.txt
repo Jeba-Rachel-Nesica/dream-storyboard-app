@@ -28,3 +28,5 @@ python-dotenv
 colorama
 # Testing
 pytest
+opencv-python-headless
+
