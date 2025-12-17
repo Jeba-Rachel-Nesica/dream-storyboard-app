@@ -1,6 +1,6 @@
 import streamlit as st
-from app.pipelines.identity import detect_and_embed_faces
-from app.storage import state
+from pipelines.identity import detect_and_embed_faces
+from storage import state
 
 CONSENT_TEXT = "I have permission to use these photos."
 

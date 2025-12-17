@@ -1,5 +1,5 @@
 import streamlit as st
-from app.storage import state
+from storage import state
 
 def script_input():
     st.header("2. Upload Rewritten Dream Script")
