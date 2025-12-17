@@ -3,18 +3,28 @@ from PIL import Image
 import torch
 from diffusers import StableDiffusionImg2ImgPipeline, StableDiffusionPipeline
 import random
-from pipelines.identity import compute_face_similarity
+from app.pipelines.identity import compute_face_similarity
 
 # Provider interface: can swap to ComfyUI/Ollama if needed
 class DiffusionProvider:
-    def __init__(self, model_path=None, device='cpu'):
-        self.device = device
-        self.pipe = StableDiffusionPipeline.from_pretrained(model_path or "runwayml/stable-diffusion-v1-5").to(device)
+    def __init__(self, model_path=None, device=None):
+        if device is None:
+            self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        else:
+            self.device = device
+        print(f"[DiffusionProvider] Using device: {self.device}")
+        self.pipe = None
+        self.model_path = model_path or "runwayml/stable-diffusion-v1-5"
+    
+    def _lazy_load(self):
+        if self.pipe is None:
+            self.pipe = StableDiffusionPipeline.from_pretrained(self.model_path).to(self.device)
 
     def generate(self, prompt, negative_prompt, seed, ref_img=None, face_emb=None):
+        self._lazy_load()
         generator = torch.Generator(self.device).manual_seed(seed)
         if ref_img is not None:
-            img_pipe = StableDiffusionImg2ImgPipeline.from_pretrained(self.pipe.model_name_or_path).to(self.device)
+            img_pipe = StableDiffusionImg2ImgPipeline.from_pretrained(self.model_path).to(self.device)
             img = img_pipe(prompt=prompt, negative_prompt=negative_prompt, image=ref_img, strength=0.7, guidance_scale=7.5, generator=generator).images[0]
         else:
             img = self.pipe(prompt=prompt, negative_prompt=negative_prompt, guidance_scale=7.5, generator=generator).images[0]

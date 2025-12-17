@@ -1,4 +1,12 @@
 import numpy as np
+import os
+import sys
+
+# Set OpenCV to not use GUI
+os.environ['OPENCV_IO_ENABLE_OPENEXR'] = '1'
+if sys.platform != 'win32':
+    os.environ['QT_QPA_PLATFORM'] = 'offscreen'
+
 import cv2
 from insightface.app import FaceAnalysis
 from PIL import Image
@@ -9,7 +17,12 @@ face_app = None
 def get_face_app():
     global face_app
     if face_app is None:
-        face_app = FaceAnalysis(name='buffalo_l', providers=['CPUExecutionProvider'])
+        try:
+            # Try CUDA first
+            face_app = FaceAnalysis(name='buffalo_l', providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
+        except Exception:
+            # Fallback to CPU
+            face_app = FaceAnalysis(name='buffalo_l', providers=['CPUExecutionProvider'])
         face_app.prepare(ctx_id=0, det_size=(224,224))
     return face_app
 

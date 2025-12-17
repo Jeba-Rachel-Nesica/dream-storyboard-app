@@ -1,7 +1,7 @@
 import streamlit as st
-from pipelines.stylize import stylize_img2img
-from pipelines.compose_video import compose_video
-from storage import state
+from app.pipelines.stylize import stylize_img2img
+from app.pipelines.compose_video import compose_video
+from app.storage import state
 import os
 
 def video_export():

@@ -1,7 +1,7 @@
 import streamlit as st
-from pipelines.beats import extract_beats
-from pipelines.safety import is_safe_text
-from storage import state
+from app.pipelines.beats import extract_beats
+from app.pipelines.safety import is_safe_text
+from app.storage import state
 
 def beats_editor():
     st.header("3. Extract & Edit Beats")

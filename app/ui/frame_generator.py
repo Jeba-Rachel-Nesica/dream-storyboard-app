@@ -1,7 +1,7 @@
 import streamlit as st
-from pipelines.generation import generate_candidates, auto_rank_candidates
-from pipelines.identity import compute_face_similarity
-from storage import state
+from app.pipelines.generation import generate_candidates, auto_rank_candidates
+from app.pipelines.identity import compute_face_similarity
+from app.storage import state
 import numpy as np
 
 def frame_generator():
